@@ -116,11 +116,41 @@ public class Eventghost {
 				DataInputStream is = new DataInputStream(connection.getInputStream());
 				DataOutputStream os = new DataOutputStream(connection.getOutputStream());
 				os.writeBytes("quintessence\n\r");
-				String responseLine = new String(is.readLine());
+				
+				
+				//Added by Javier Refuerzo 2017.03.27
+				//used to fix depreciated is.readLine() method "String responseLine = new String(is.readLine());"
+				//added loop to fix BufferReader hang if password was incorrect
+           			InputStreamReader inputStreamReader = new InputStreamReader(is);
+            			BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+            			String responseLine = bufferedReader.readLine();
+				
 				String cookie = responseLine + ":" + serverPassword;
 				String md5 = MD5Hex.MD5Hex(cookie);
 				os.writeBytes(md5 + "\n");
-				String accept = new String(is.readLine());
+				
+				//wait for buffer reader to be ready
+            			int loopNumber = 0;
+            			while (!bufferedReader.ready() && loopNumber < 100){
+                			Log.v(LOG_TAG, "buffer reader loop started");
+                			Thread.currentThread();
+                			Thread.sleep(500);
+                			//wait(5000);
+                			loopNumber = loopNumber + 1;
+                			Log.v(LOG_TAG, "buffer reader loop number " + loopNumber);
+            			}
+            			//if the buffer is still not ready it is possible we have an incorrect password.
+            			if (!bufferedReader.ready()){
+                			Log.v(LOG_TAG, "buffer reader was never ready");
+                			// clean up
+                			os.writeBytes("close\n");
+                			os.close();
+                			is.close();
+                			connection.close();
+                			return null;
+            			}
+            			String accept = bufferedReader.readLine();
+				
 				if (accept.equals("accept")) {
 					// Send all payloads (split with |)
 					if (payload != null && payload.length() > 0) {
